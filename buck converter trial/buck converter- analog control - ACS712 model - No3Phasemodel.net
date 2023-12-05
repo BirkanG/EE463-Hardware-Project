@@ -1,0 +1,39 @@
+* C:\Users\Levovo20x\Documents\GitHub\EE463-Hardware-Project\buck converter trial\buck converter- analog control - ACS712 model - No3Phasemodel.asc
+M1 N009 pwm_signal 0 0 IRFZ46N
+D1 N009 N003 D
+L1 N003 N004 10µH
+V3 N008 N009 12
+R1 N005 N008 0.1
+R4 N005 N004 0.1
+V13 5V 0 10V
+V1 N007 0 PULSE(0 5 0 0 0 6.66us 13.33us)
+R2 triangle_wave N007 660
+C1 triangle_wave 0 10nF
+XU1 duty_reference triangle_wave 5V 0 pwm_signal AD820
+XU3 ACS712_VOUT current_limit_reference 5V 0 decrease_duty AD820
+V6 current_limit_reference 0 3.3
+Q1 N002 N006 0 0 NPN
+C3 duty_reference 0 10µF
+R9 5V duty_reference 8.6k
+R8 N006 decrease_duty 300k
+C4 N005 N009 2200µF
+B1 ACS712_VOUT 0 V=2.5+0.083*I(R1)
+V4 N003 0 PWL(0 12 25ms 35)
+R3 duty_reference N002 2.3k
+D2 0 duty_reference 1N750
+R5 duty_reference 0 8.6k
+.model D D
+.lib C:\Users\Levovo20x\Documents\LTspiceXVII\lib\cmp\standard.dio
+.model NPN NPN
+.model PNP PNP
+.lib C:\Users\Levovo20x\Documents\LTspiceXVII\lib\cmp\standard.bjt
+.model NMOS NMOS
+.model PMOS PMOS
+.lib C:\Users\Levovo20x\Documents\LTspiceXVII\lib\cmp\standard.mos
+* 75kHz square wave
+* ACS712 MODEL
+* You may add low pass filter since\n this sensor has a bandwith of 50kHz
+.tran 25ms
+.lib ADI1.lib
+.backanno
+.end
