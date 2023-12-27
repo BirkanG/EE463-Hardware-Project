@@ -1,0 +1,23 @@
+Circuit: * C:\Users\Levovo20x\Documents\GitHub\EE463-Hardware-Project\buck converter trial\Draft2.asc
+
+Limiting rise time of source v2 to 0.0001
+Limiting fall time of source v2 to 0.0001
+.OP point found by inspection.
+
+Date: Tue Dec 19 03:13:27 2023
+Total elapsed time: 0.042 seconds.
+
+tnom = 27
+temp = 27
+method = modified trap
+totiter = 3177
+traniter = 3177
+tranpoints = 1385
+accept = 1305
+rejected = 80
+matrix size = 31
+fillins = 18
+solver = Normal
+Matrix Compiler1: 1.82 KB object code size  0.7/0.2/[0.1]
+Matrix Compiler2: 2.35 KB object code size  0.1/0.2/[0.1]
+
