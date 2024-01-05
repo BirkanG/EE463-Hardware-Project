@@ -104,10 +104,10 @@ char dashLine[] = "=============================================================
 float PWM_FREQUENCY = 75000;
 float NOT_PWM_DUTY = 99;
 
-float STANDBY_CURRENT_1_A = 0.10;
-float STANDBY_CURRENT_2_A = STANDBY_CURRENT_1_A * 2;
-float STANDBY_CURRENT_3_A = STANDBY_CURRENT_1_A * 10;
-float NOT_MAX_STANDBY_PWM = 75;
+float STANDBY_CURRENT_1_A = 0.150;
+float STANDBY_CURRENT_2_A = STANDBY_CURRENT_1_A * 3;
+float STANDBY_CURRENT_3_A = STANDBY_CURRENT_1_A * 5;
+float NOT_MAX_STANDBY_PWM = 40;
 
 float read_battery_charging_current();
 
@@ -116,14 +116,20 @@ void setup() {
   pinMode(pinToUse, OUTPUT);
   digitalWrite(pinToUse, HIGH);
   pinMode(A0, INPUT);
+  pinMode(A1, INPUT); // Battery - to ground
+  pinMode(A2, INPUT); // RECT + to ground
   PWM_Instance = new AVR_PWM(pinToUse, PWM_FREQUENCY, 99);
 }
 
 uint8_t program_state = 0;
 void loop() {
-  float desired_current = 10.0f;
-  float scale_factor = 0.769;
+  float desired_current = 5.0f;
+  float scale_factor = 0.84f;
   desired_current = desired_current * scale_factor;
+
+  float rect_reading = analogRead(A2)*(0.00488)*9.08;
+  float bat_reading = analogRead(A1)*(0.00488);
+  Serial.println("Rect: "+String(rect_reading)+ " Bat: "+String(bat_reading));
   Serial.println("State: "+String(program_state) + " PWM: "+String(100-NOT_PWM_DUTY));
   if (program_state == 0) {  //Ensures the load is connected
     NOT_PWM_DUTY = 99;
@@ -131,7 +137,7 @@ void loop() {
     float current_reading_error = read_battery_charging_current();
     for (; NOT_PWM_DUTY > NOT_MAX_STANDBY_PWM; NOT_PWM_DUTY--) {
       PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-      delay(1);
+      delayMicroseconds(150);
       float current_reading = read_battery_charging_current();
       if (current_reading - current_reading_error > STANDBY_CURRENT_2_A) {
         program_state = 1;  //LOAD IS CONNECTED
@@ -141,6 +147,7 @@ void loop() {
   } else {
 
     float current_reading_A = read_battery_charging_current();
+    Serial.println(current_reading_A);
     if (current_reading_A < STANDBY_CURRENT_2_A) {
       program_state = 0;  // LOAD IS DISCONNECTED
     } else if (current_reading_A < (desired_current)) {
@@ -163,12 +170,11 @@ void loop() {
 }
 
 
-
 float read_battery_charging_current() {
   const float digital_analog_ratio = 0.0390;
 
   float offset = 512;
-  uint8_t number_of_samples = 5;
+  uint8_t number_of_samples = 10;
   uint8_t delay_between_samples_us = 5;
 
   float digital_sum = 0;
