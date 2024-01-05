@@ -123,16 +123,16 @@ void setup() {
 
 uint8_t program_state = 0;
 void loop() {
-  float desired_current = 7.5f;
+  float desired_current = 6.0f;
 
   float rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
   float battery_neg_reading = analogRead(A1) * (0.00488) * 9.08;
 
-  Serial.println("Rect: " + String(rectifier_voltage_reading) + " Bat: " + String(battery_neg_reading));
-  Serial.println("State: " + String(program_state) + " PWM: " + String(100 - NOT_PWM_DUTY));
+  //Serial.println("Rect: " + String(rectifier_voltage_reading) + " Bat: " + String(battery_neg_reading));
+  //Serial.println("State: " + String(program_state) + " PWM: " + String(100 - NOT_PWM_DUTY));
   if (program_state == 0) {        //Ensures the load is connected
     digitalWrite(pinToUse, HIGH);  //turn-off mosfet
-    delay(500);
+    delay(250);
     if (rectifier_voltage_reading > 20) {  //power is connected
       //rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
       float battery_neg_reading_old = analogRead(A1) * (0.00488) * 9.08;
@@ -167,14 +167,14 @@ void loop() {
     float current_reading_A = read_battery_charging_current();
     if (current_reading_A < 0.5f) {
       program_state = 0;
-    } else if (current_reading_A < (desired_current - 0.75)) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY - 1.25;
+    } else if (current_reading_A < desired_current) {
+      NOT_PWM_DUTY = NOT_PWM_DUTY - 1;
       if (NOT_PWM_DUTY < 1) {
         NOT_PWM_DUTY = 1;
       }
       PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-    } else if (current_reading_A > (desired_current + 0.75)) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY + 1.25;
+    } else if (current_reading_A > desired_current) {
+      NOT_PWM_DUTY = NOT_PWM_DUTY + 1;
       if (NOT_PWM_DUTY > 99) {
         NOT_PWM_DUTY = 99;
       }
@@ -189,7 +189,7 @@ float read_battery_charging_current() {
   const float digital_analog_ratio = 0.0390;
 
   float offset = 512;
-  uint8_t number_of_samples = 5;
+  uint8_t number_of_samples = 1;
   uint8_t delay_between_samples_us = 5;
 
   float digital_sum = 0;
