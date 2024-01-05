@@ -116,61 +116,76 @@ void setup() {
   pinMode(pinToUse, OUTPUT);
   digitalWrite(pinToUse, HIGH);
   pinMode(A0, INPUT);
-  pinMode(A1, INPUT); // Battery - to ground
-  pinMode(A2, INPUT); // RECT + to ground
+  pinMode(A1, INPUT);  // Battery - to ground
+  pinMode(A2, INPUT);  // RECT + to ground
   PWM_Instance = new AVR_PWM(pinToUse, PWM_FREQUENCY, 99);
 }
 
 uint8_t program_state = 0;
 void loop() {
-  float desired_current = 5.0f;
-  float scale_factor = 0.84f;
-  desired_current = desired_current * scale_factor;
+  float desired_current = 2.0f;
 
-  float rect_reading = analogRead(A2)*(0.00488)*9.08;
-  float bat_reading = analogRead(A1)*(0.00488);
-  Serial.println("Rect: "+String(rect_reading)+ " Bat: "+String(bat_reading));
-  Serial.println("State: "+String(program_state) + " PWM: "+String(100-NOT_PWM_DUTY));
-  if (program_state == 0) {  //Ensures the load is connected
-    NOT_PWM_DUTY = 99;
-    PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-    float current_reading_error = read_battery_charging_current();
-    for (; NOT_PWM_DUTY > NOT_MAX_STANDBY_PWM; NOT_PWM_DUTY--) {
-      PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-      delayMicroseconds(150);
-      float current_reading = read_battery_charging_current();
-      if (current_reading - current_reading_error > STANDBY_CURRENT_2_A) {
-        program_state = 1;  //LOAD IS CONNECTED
-        break;
+  float rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
+  float battery_neg_reading = analogRead(A1) * (0.00488) * 9.08;
+
+  Serial.println("Rect: " + String(rectifier_voltage_reading) + " Bat: " + String(battery_neg_reading));
+  Serial.println("State: " + String(program_state) + " PWM: " + String(100 - NOT_PWM_DUTY));
+  if (program_state == 0) {        //Ensures the load is connected
+    digitalWrite(pinToUse, HIGH);  //turn-off mosfet
+    delay(500);
+    if (rectifier_voltage_reading > 20) {  //power is connected
+      //rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
+      float battery_neg_reading_old = analogRead(A1) * (0.00488) * 9.08;
+      delay(3500);
+      float battery_neg_reading_new = analogRead(A1) * (0.00488) * 9.08;
+      rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
+
+      if (rectifier_voltage_reading > 20) {  //battery and rectifier is ON
+        if ((rectifier_voltage_reading - battery_neg_reading_new < 14.5) && abs(battery_neg_reading_new - battery_neg_reading_old) < 0.25) {
+          NOT_PWM_DUTY = 99;
+          PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
+          while (true) {  // ensure that current reaches to a suitable level
+            delay(1);
+            float current_reading_A = read_battery_charging_current();
+            if (current_reading_A < 1.5f) {
+              NOT_PWM_DUTY = NOT_PWM_DUTY - 1;
+              PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
+              if (NOT_PWM_DUTY < 20) {
+                NOT_PWM_DUTY = 99;
+                break;
+              }
+            } else {
+              program_state = 1;
+              break;
+            }
+          }
+        }
       }
     }
-  } else {
-
+  } else if (program_state == 1) {
+    delayMicroseconds(10);
     float current_reading_A = read_battery_charging_current();
-    Serial.println(current_reading_A);
-    if (current_reading_A < STANDBY_CURRENT_2_A) {
-      program_state = 0;  // LOAD IS DISCONNECTED
-    } else if (current_reading_A < (desired_current)) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY - 0.1f;
+    if (current_reading_A < 0.5f) {
+      program_state = 0;
+    } else if (current_reading_A < desired_current) {
+      NOT_PWM_DUTY = NOT_PWM_DUTY - 1;
       if (NOT_PWM_DUTY < 1) {
-        NOT_PWM_DUTY = 1;  //increase duty
+        NOT_PWM_DUTY = 1;
       }
       PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-      delayMicroseconds(10);
-
-    } else if (current_reading_A > (desired_current)) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY + 0.1f;
+    } else if (current_reading_A > desired_current) {
+      NOT_PWM_DUTY = NOT_PWM_DUTY + 1;
       if (NOT_PWM_DUTY > 99) {
-        NOT_PWM_DUTY = 99;  //decrease duty
+        NOT_PWM_DUTY = 99;
       }
       PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-      delayMicroseconds(10);
     }
   }
 }
 
 
 float read_battery_charging_current() {
+  const float scale_factor = 1.2f;
   const float digital_analog_ratio = 0.0390;
 
   float offset = 512;
@@ -186,6 +201,7 @@ float read_battery_charging_current() {
   float digital_sum_average = digital_sum / number_of_samples;
   float offset_free_digital_read_value = digital_sum_average - offset;
   float current_A = offset_free_digital_read_value * digital_analog_ratio;
+  current_A = current_A * scale_factor;
   return current_A;
 }
 
