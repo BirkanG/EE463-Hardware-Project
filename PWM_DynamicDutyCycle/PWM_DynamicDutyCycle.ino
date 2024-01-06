@@ -122,8 +122,10 @@ void setup() {
 }
 
 uint8_t program_state = 0;
+const float desired_current = 5.0f;
+const float desired_current_digital = 512 + (desired_current/0.0390);
+const float low_current_digital = 512+ (0.5f/0.0390);
 void loop() {
-  float desired_current = 6.0f;
 
   float rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
   float battery_neg_reading = analogRead(A1) * (0.00488) * 9.08;
@@ -164,17 +166,20 @@ void loop() {
     }
   } else if (program_state == 1) {
     delayMicroseconds(10);
-    float current_reading_A = read_battery_charging_current();
-    if (current_reading_A < 0.5f) {
+    //float current_reading_A = read_battery_charging_current();
+    float current_reading_A = analogRead(A0);
+      if (current_reading_A < low_current_digital) {
       program_state = 0;
-    } else if (current_reading_A < desired_current) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY - 1;
+    }
+    else if (current_reading_A < desired_current_digital) {
+      NOT_PWM_DUTY = NOT_PWM_DUTY - 5;
       if (NOT_PWM_DUTY < 1) {
         NOT_PWM_DUTY = 1;
       }
       PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-    } else if (current_reading_A > desired_current) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY + 1;
+    }
+    else if (current_reading_A > desired_current_digital) {
+      NOT_PWM_DUTY = NOT_PWM_DUTY + 5;
       if (NOT_PWM_DUTY > 99) {
         NOT_PWM_DUTY = 99;
       }
@@ -188,9 +193,9 @@ float read_battery_charging_current() {
   const float scale_factor = 1.25f;
   const float digital_analog_ratio = 0.0390;
 
-  float offset = 512;
-  uint8_t number_of_samples = 1;
-  uint8_t delay_between_samples_us = 5;
+  const float offset = 512;
+  const uint8_t number_of_samples = 1;
+  const uint8_t delay_between_samples_us = 5;
 
   float digital_sum = 0;
   for (uint8_t i = 0; i < number_of_samples; i++) {
@@ -198,6 +203,7 @@ float read_battery_charging_current() {
     digital_sum = digital_sum + digital_read_value;
     delayMicroseconds(delay_between_samples_us);
   }
+
   float digital_sum_average = digital_sum / number_of_samples;
   float offset_free_digital_read_value = digital_sum_average - offset;
   float current_A = offset_free_digital_read_value * digital_analog_ratio;
