@@ -57,6 +57,7 @@
   Pin 11 => TIMER2(A)
 ******************************************************************************************************************************/
 
+
 #define _PWM_LOGLEVEL_ 4
 
 #include "AVR_PWM.h"
@@ -113,28 +114,39 @@ float read_battery_charging_current();
 
 void setup() {
   Serial.begin(115200);
+  pinMode(8, INPUT);
   pinMode(pinToUse, OUTPUT);
   digitalWrite(pinToUse, HIGH);
   pinMode(A0, INPUT);
   pinMode(A1, INPUT);  // Battery - to ground
   pinMode(A2, INPUT);  // RECT + to ground
   PWM_Instance = new AVR_PWM(pinToUse, PWM_FREQUENCY, 99);
+
+  ADCSRA &= ~(1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);  // Clear prescaler bits
+  ADCSRA |= (1 << ADPS2);                                 // Set prescaler to 16
 }
 
 uint8_t program_state = 0;
 const float desired_current = 5.0f;
-const float desired_current_digital = 512 + (desired_current/0.0390);
-const float low_current_digital = 512+ (0.5f/0.0390);
+const float desired_current_digital = 512 + (desired_current / 0.0390);
+const float low_current_digital = 512 + (0.5f / 0.0390);
 void loop() {
-
-  float rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
-  float battery_neg_reading = analogRead(A1) * (0.00488) * 9.08;
 
   //Serial.println("Rect: " + String(rectifier_voltage_reading) + " Bat: " + String(battery_neg_reading));
   //Serial.println("State: " + String(program_state) + " PWM: " + String(100 - NOT_PWM_DUTY));
-  if (program_state == 0) {        //Ensures the load is connected
-    digitalWrite(pinToUse, HIGH);  //turn-off mosfet
+  if (program_state == 1) {
+    if (PINB&1) { //if 8 is high (PB0)->  increase, otherwise decrease current.
+      PORTB = B00000000;
+    } else {
+      PORTB = B00000100;
+    }
+  }
+
+  else if (program_state == 0) {   //Ensures the load is connected
     delay(250);
+    digitalWrite(pinToUse, HIGH);  //turn-off mosfet
+    float rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
+    float battery_neg_reading = analogRead(A1) * (0.00488) * 9.08;
     if (rectifier_voltage_reading > 20) {  //power is connected
       //rectifier_voltage_reading = analogRead(A2) * (0.00488) * 9.08;
       float battery_neg_reading_old = analogRead(A1) * (0.00488) * 9.08;
@@ -158,32 +170,12 @@ void loop() {
               }
             } else {
               program_state = 1;
+              digitalWrite(pinToUse, HIGH);
               break;
             }
           }
         }
       }
-    }
-  } else if (program_state == 1) {
-    delayMicroseconds(10);
-    //float current_reading_A = read_battery_charging_current();
-    float current_reading_A = analogRead(A0);
-      if (current_reading_A < low_current_digital) {
-      program_state = 0;
-    }
-    else if (current_reading_A < desired_current_digital) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY - 5;
-      if (NOT_PWM_DUTY < 1) {
-        NOT_PWM_DUTY = 1;
-      }
-      PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
-    }
-    else if (current_reading_A > desired_current_digital) {
-      NOT_PWM_DUTY = NOT_PWM_DUTY + 5;
-      if (NOT_PWM_DUTY > 99) {
-        NOT_PWM_DUTY = 99;
-      }
-      PWM_Instance->setPWM(pinToUse, PWM_FREQUENCY, NOT_PWM_DUTY);
     }
   }
 }
